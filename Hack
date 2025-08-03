@@ -1,0 +1,181 @@
+local Perplexed = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"))();
+
+-- Config Manager
+local ConfigManager = Perplexed:ConfigManager({
+    Directory = "Perplexed-UI",
+    Config    = "AutoGreen-Configs"
+})
+Perplexed:Loader("rbxassetid://120245531583106", 2.5).yield()
+
+-- Main Window
+local Window = Perplexed.new({
+    Name     = "Perplexed.lol",
+    Keybind  = "LeftAlt",
+    Logo     = "rbxassetid://120245531583106",
+    Scale    = Perplexed.Scale.Window,
+    TextSize = 15
+})
+local Tab     = Window:DrawTab({ Name = "Blatant", Icon = "skull", EnableScrolling = true })
+local Section = Tab:DrawSection({ Name = "Settings", Position = "left" })
+
+-- State flags
+local Flags = {
+    AutoGreen      = false,
+    HighShoot      = false,
+    BoostHeight    = 50,
+    WalkSpeedMod   = false,
+    WalkSpeed      = 16,
+    InfStamina     = false,
+    AutoGrabBall   = false,
+}
+
+-- Animation IDs to detect
+local AnimIds = {
+    ["109728760457474"] = true,
+    ["121145066577314"] = true,
+    ["135335247215687"] = true,
+    ["71550823612272"]  = true,
+    ["115388822805285"] = true,
+}
+
+---- UI ----
+
+-- Auto Green spam
+Section:AddToggle({
+    Name    = "Auto Green",
+    Flag    = "AutoGreen",
+    Default = Flags.AutoGreen,
+    Callback= function(v) Flags.AutoGreen = v end,
+})
+
+-- High Shoot toggle
+Section:AddToggle({
+    Name    = "High Shoot",
+    Flag    = "HighShoot",
+    Default = Flags.HighShoot,
+    Callback= function(v) Flags.HighShoot = v end,
+})
+
+-- Boost Height input box (numbers only)
+Section:AddTextBox({
+    Name        = "High Shoot Height",
+    Placeholder = "e.g. 50",
+    Default     = tostring(Flags.BoostHeight),
+    Flag        = "BoostHeight",
+    Callback    = function(v)
+        local n = tonumber(v)
+        if n and n >= 0 then
+            Flags.BoostHeight = n
+        end
+    end,
+})
+
+-- WalkSpeed Modifier toggle
+Section:AddToggle({
+    Name    = "WalkSpeed Modifier",
+    Flag    = "WalkSpeedMod",
+    Default = Flags.WalkSpeedMod,
+    Callback= function(v) Flags.WalkSpeedMod = v end,
+})
+
+-- WalkSpeed slider (ensure default within range)
+Section:AddSlider({
+    Name    = "WalkSpeed",
+    Min     = 16,
+    Max     = 200,
+    Default = math.clamp(Flags.WalkSpeed, 16, 200),
+    Round   = 1,
+    Flag    = "WalkSpeed",
+    Callback= function(v)
+        Flags.WalkSpeed = v
+        -- apply immediately if toggle is on
+        if Flags.WalkSpeedMod and game.Players.LocalPlayer.Character then
+            local h = game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if h then h.WalkSpeed = v end
+        end
+    end,
+})
+
+-- Infinite Stamina toggle
+Section:AddToggle({
+    Name    = "Inf Stamina",
+    Flag    = "InfStamina",
+    Default = Flags.InfStamina,
+    Callback= function(v) Flags.InfStamina = v end,
+})
+
+-- Auto Grab Basketball toggle
+Section:AddToggle({
+    Name    = "Auto Grab Ball",
+    Flag    = "AutoGrabBall",
+    Default = Flags.AutoGrabBall,
+    Callback= function(v) Flags.AutoGrabBall = v end,
+})
+
+-- Init Config UI
+Window:DrawConfig({
+    Name   = "Config",
+    Icon   = "folder",
+    Config = ConfigManager,
+}):Init()
+
+---- Runtime Logic ----
+
+local RunService       = game:GetService("RunService")
+local RepStorage       = game:GetService("ReplicatedStorage")
+local Players          = game:GetService("Players")
+local LocalPlayer      = Players.LocalPlayer
+
+-- Keep walkspeed permanent on respawn
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char:WaitForChild("Humanoid").WalkSpeed = Flags.WalkSpeed
+end)
+
+-- Main frame loop
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+
+    -- Auto Green spam
+    if Flags.AutoGreen then
+        RepStorage.Events.Shoot:FireServer(false, -0.9440917599201202, true)
+    end
+
+    -- High Shoot teleport when anim detected
+    if Flags.HighShoot and hum and hrp then
+        for _, track in pairs(hum:GetPlayingAnimationTracks()) do
+            local id = track.Animation.AnimationId:match("%d+")
+            if AnimIds[id] then
+                -- clamp Y so you never go underground
+                local targetY = math.max(Flags.BoostHeight, hrp.Position.Y + Flags.BoostHeight)
+                hrp.CFrame = CFrame.new(hrp.Position.X, targetY, hrp.Position.Z)
+                break
+            end
+        end
+    end
+
+    -- WalkSpeed modifier
+    if Flags.WalkSpeedMod and hum then
+        hum.WalkSpeed = Flags.WalkSpeed
+    end
+
+    -- Infinite Stamina
+    if Flags.InfStamina and LocalPlayer:FindFirstChild("Values") then
+        local st = LocalPlayer.Values:FindFirstChild("Stamina")
+        if st then st.Value = math.huge end
+    end
+
+    -- Auto Grab Basketballs near you
+    if Flags.AutoGrabBall and hrp then
+        local myPos = hrp.Position
+        for _, part in ipairs(workspace:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name:lower():find("basketball") then
+                if (part.Position - myPos).Magnitude <= 10 then
+                    firetouchinterest(hrp, part, 0)
+                    firetouchinterest(hrp, part, 1)
+                end
+            end
+        end
+    end
+end)
