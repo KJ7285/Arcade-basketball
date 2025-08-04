@@ -1,7 +1,7 @@
 local Perplexed = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"))()
 local ConfigManager = Perplexed:ConfigManager({
     Directory = "Perplexed-UI",
-    Config    = "AutoGreen-Configs"
+    Config    = "Perplexd"
 })
 Perplexed:Loader("rbxassetid://120245531583106", 2.5).yield()
 
